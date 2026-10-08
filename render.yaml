@@ -17,6 +17,8 @@ services:
         sync: false
       - key: PACKAGE_STARS
         value: "0"
+      - key: DB_PATH
+        value: /opt/render/project/src/data/tennis.db
       - key: PYTHON_VERSION
         value: "3.12.7"
     disk:

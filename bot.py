@@ -21,7 +21,7 @@ TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PACKAGE_STARS = int(os.getenv("PACKAGE_STARS", "0"))
 SUPPORT = os.getenv("SUPPORT_USERNAME", "").lstrip("@")
-DB = ROOT / "tennis.db"
+DB = Path(os.getenv("DB_PATH", str(ROOT / "tennis.db")))
 TZ = ZoneInfo("Asia/Tbilisi")
 dp = Dispatcher()
 

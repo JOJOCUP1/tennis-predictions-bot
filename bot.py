@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandObject
 from aiogram.types import (
     Message, CallbackQuery, PreCheckoutQuery, InlineKeyboardButton,
-    InlineKeyboardMarkup, LabeledPrice,
+    InlineKeyboardMarkup, LabeledPrice, ReplyKeyboardMarkup, KeyboardButton,
 )
 from dotenv import load_dotenv
 
@@ -78,6 +78,16 @@ def menu():
         [InlineKeyboardButton(text="📞 მხარდაჭერა", callback_data="support")],
     ])
 
+def keyboard(user_id):
+    rows = [
+        [KeyboardButton(text="🎾 დღის პროგნოზები")],
+        [KeyboardButton(text="💎 დღის პაკეტი — 10 ₾")],
+        [KeyboardButton(text="📜 წესები"), KeyboardButton(text="📞 მხარდაჭერა")],
+    ]
+    if user_id == ADMIN_ID:
+        rows.append([KeyboardButton(text="🔐 ადმინპანელი")])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=True)
+
 @dp.message(Command("start"))
 async def start(msg: Message):
     with conn() as db:
@@ -89,8 +99,51 @@ async def start(msg: Message):
         "🎾 Tennis Predictions\n\n"
         "დღის ჩოგბურთის მატჩების ანალიზები და პროგნოზები. "
         "მოგება გარანტირებული არ არის.\n\nაირჩიეთ მოქმედება:",
-        reply_markup=menu()
+        reply_markup=keyboard(msg.from_user.id)
     )
+
+@dp.message(F.text == "📜 წესები")
+async def text_rules(msg: Message):
+    await msg.answer(RULES)
+
+@dp.message(F.text == "📞 მხარდაჭერა")
+async def text_support(msg: Message):
+    await msg.answer(f"📞 მხარდაჭერა: @{SUPPORT}" if SUPPORT else "მხარდაჭერის კონტაქტი ჯერ არ არის მითითებული.")
+
+@dp.message(F.text == "🎾 დღის პროგნოზები")
+async def text_predictions(msg: Message):
+    day = today()
+    if not has_access(msg.from_user.id, day):
+        await msg.answer("🔒 საჭიროა დღის პაკეტის შეძენა.")
+        return
+    with conn() as db:
+        rows = db.execute("SELECT content FROM predictions WHERE day=? ORDER BY id", (day,)).fetchall()
+    if not rows:
+        await msg.answer("დღევანდელი პროგნოზები ჯერ არ გამოქვეყნებულა.")
+    for (content,) in rows:
+        await msg.answer("🎾 " + content)
+
+@dp.message(F.text == "💎 დღის პაკეტი — 10 ₾")
+async def text_package(msg: Message):
+    day = today()
+    if has_access(msg.from_user.id, day):
+        await msg.answer("✅ დღევანდელი წვდომა უკვე გაქვთ.")
+    elif PACKAGE_STARS <= 0:
+        await msg.answer("💎 დღის პაკეტი — 10 ₾\\nმოქმედებს დღევანდელი დღის ბოლომდე თბილისის დროით.\\n⚙️ გადახდები ჯერ გამორთულია.")
+    else:
+        await msg.answer_invoice(
+            title="დღის ჩოგბურთის პროგნოზები",
+            description=f"პროგნოზები {day} დღისთვის. მოგება გარანტირებული არ არის.",
+            payload=f"daily:{day}:{msg.from_user.id}",
+            currency="XTR",
+            prices=[LabeledPrice(label="დღის პაკეტი", amount=PACKAGE_STARS)],
+            provider_token="",
+        )
+
+@dp.message(F.text == "🔐 ადმინპანელი")
+async def text_admin(msg: Message):
+    if msg.from_user.id == ADMIN_ID:
+        await msg.answer("🔐 ადმინპანელი\\n/add ტექსტი — დამატება\\n/list — ნახვა\\n/delete ID — წაშლა\\n/stats — სტატისტიკა")
 
 @dp.message(Command("myid"))
 async def myid(msg: Message):
